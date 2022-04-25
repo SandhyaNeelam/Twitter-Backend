@@ -86,10 +86,10 @@ public class PostController : ControllerBase
         return NoContent();
     }
 
-    [HttpGet()]
-    public async Task<ActionResult<List<Post>>> GetAllPosts()
+    [HttpGet]
+    public async Task<ActionResult<List<Post>>> GetAllPosts([FromQuery] int Limit, int PageNumber)
     {
-        var allPosts = await _post.GetAll();
+        var allPosts = await _post.GetAll(Limit, PageNumber);
         return Ok(allPosts);
     }
 
@@ -99,10 +99,5 @@ public class PostController : ControllerBase
         var Post = await _post.GetById(PostId);
         return Ok(Post);
     }
-
-
-
-
-
 
 }

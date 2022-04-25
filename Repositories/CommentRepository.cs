@@ -1,4 +1,5 @@
 using Dapper;
+using Microsoft.Extensions.Caching.Memory;
 using Twitter_BE.Models;
 using Twitter_BE.Utilities;
 
@@ -7,17 +8,20 @@ namespace Twitter_BE.Repositories;
 public interface ICommentRepository
 {
     Task<Comment> Create(Comment Item);
-    Task<List<Comment>> GetAll(int PostId);
+    Task<List<Comment>> GetAll(int PostId, int Limit, int PageNumber);
     Task Delete(int Id);
     Task<Comment> GetById(int CommentId);
 }
 
 public class CommentRepository : BaseRepository, ICommentRepository
 {
-    public CommentRepository(IConfiguration config) : base(config)
+    private readonly IMemoryCache _memoryCache;
+    public CommentRepository(IConfiguration config, IMemoryCache memoryCache) : base(config)
     {
+        _memoryCache = memoryCache;
 
     }
+
 
     public async Task<Comment> Create(Comment Item)
     {
@@ -34,11 +38,18 @@ public class CommentRepository : BaseRepository, ICommentRepository
             await con.ExecuteAsync(query, new { Id });
     }
 
-    public async Task<List<Comment>> GetAll(int PostId)
+    public async Task<List<Comment>> GetAll(int PostId, int Limit, int PageNumber)
     {
-        var query = $@"SELECT * FROM {TableNames.comment} WHERE post_id = @PostId ORDER BY created_at DESC";
-        using (var con = NewConnection)
-            return (await con.QueryAsync<Comment>(query, new { PostId })).AsList();
+        var commentCache = _memoryCache.Get<List<Comment>>(key: $"comment {Limit} : {PageNumber}");
+        if (commentCache is null)
+        {
+            var query = $@"SELECT * FROM {TableNames.comment} WHERE post_id = @PostId ORDER BY created_at DESC LIMIT @Limit OFFSET @PageNumber";
+            using (var con = NewConnection)
+                commentCache = (await con.QueryAsync<Comment>(query, new { PostId, @PageNumber = (PageNumber - 1) * Limit, Limit })).AsList();
+            _memoryCache.Set(key: "comment", commentCache, TimeSpan.FromMinutes(value: 1));
+
+        }
+        return commentCache;
     }
 
     public async Task<Comment> GetById(int CommentId)

@@ -45,9 +45,9 @@ public class CommentController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<Comment>>> GetAllComments([FromQuery] int post_id)
+    public async Task<ActionResult<List<Comment>>> GetAllComments([FromQuery] int post_id, int Limit, int PageNumber)
     {
-        var allComment = await _comment.GetAll(post_id);
+        var allComment = await _comment.GetAll(post_id, Limit, PageNumber);
         return Ok(allComment);
     }
 

@@ -1,4 +1,5 @@
 using Dapper;
+using Microsoft.Extensions.Caching.Memory;
 using Twitter_BE.Models;
 using Twitter_BE.Utilities;
 
@@ -14,8 +15,11 @@ public interface IUserRepository
 
 public class UserRepository : BaseRepository, IUserRepository
 {
-    public UserRepository(IConfiguration config) : base(config)
+    private readonly IMemoryCache _memoryCache;
+
+    public UserRepository(IConfiguration config, IMemoryCache memoryCache) : base(config)
     {
+        _memoryCache = memoryCache;
 
     }
 
@@ -36,9 +40,16 @@ public class UserRepository : BaseRepository, IUserRepository
 
     public async Task<User> GetUser(string Email)
     {
-        var query = $@"SELECT * FROM ""{TableNames.user}"" WHERE email= @Email ";
-        using (var con = NewConnection)
-            return await con.QuerySingleOrDefaultAsync<User>(query, new { Email });
+        var userCache = _memoryCache.Get<User>(key: $"user {Email}");
+        if (userCache is null)
+        {
+            var query = $@"SELECT * FROM ""{TableNames.user}"" WHERE email= @Email ";
+            using (var con = NewConnection)
+                userCache = await con.QuerySingleOrDefaultAsync<User>(query, new { Email });
+            _memoryCache.Set(key: "user", userCache, TimeSpan.FromMinutes(value: 1));
+
+        }
+        return userCache;
     }
 
     public async Task Update(User Item)
